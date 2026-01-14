@@ -17,5 +17,8 @@
   "bugs": {
     "url": "https://github.com/Ari-Han-t/GDG-BACKEND-REPO-Arihant_Gupta/issues"
   },
-  "homepage": "https://github.com/Ari-Han-t/GDG-BACKEND-REPO-Arihant_Gupta#readme"
+  "homepage": "https://github.com/Ari-Han-t/GDG-BACKEND-REPO-Arihant_Gupta#readme",
+  "dependencies": {
+    "express": "^5.2.1"
+  }
 }
