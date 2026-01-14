@@ -3,11 +3,17 @@ const router = express.Router();
 const auth = require("../middleware/auth.middleware");
 
 const {
-  createTask,
-  getTasks,
-} = require("../controllers/task.controller");
-
+    createTask,
+    getTasks,
+    updateTask,
+  } = require("../controllers/task.controller");
+  
 router.post("/", auth, createTask);
 router.get("/", auth, getTasks);
 
-module.exports = router;
+
+
+
+  router.put("/:id", auth, updateTask);
+  
+  module.exports = router;

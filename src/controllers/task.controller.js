@@ -28,3 +28,33 @@ exports.getTasks = async (req, res) => {
 
   res.json(tasks);
 };
+
+exports.updateTask = async (req, res) => {
+    const taskId = parseInt(req.params.id);
+    const { title, description, priority, status, deadline } = req.body;
+  
+    const task = await prisma.task.findFirst({
+      where: {
+        id: taskId,
+        userId: req.userId,
+      },
+    });
+  
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+  
+    const updatedTask = await prisma.task.update({
+      where: { id: taskId },
+      data: {
+        title,
+        description,
+        priority,
+        status,
+        deadline: deadline ? new Date(deadline) : undefined,
+      },
+    });
+  
+    res.json(updatedTask);
+  };
+  
