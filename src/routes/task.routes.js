@@ -2,20 +2,12 @@ const express = require("express");
 const router = express.Router();
 const auth = require("../middleware/auth.middleware");
 
-router.post("/", auth, (req, res) => {
-  res.json({ message: "Create task" });
-});
+const {
+  createTask,
+  getTasks,
+} = require("../controllers/task.controller");
 
-router.get("/", auth, (req, res) => {
-  res.json({ message: "Get tasks" });
-});
-
-router.put("/:id", auth, (req, res) => {
-  res.json({ message: "Update task" });
-});
-
-router.delete("/:id", auth, (req, res) => {
-  res.json({ message: "Delete task" });
-});
+router.post("/", auth, createTask);
+router.get("/", auth, getTasks);
 
 module.exports = router;
