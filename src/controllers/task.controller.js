@@ -21,13 +21,45 @@ exports.createTask = async (req, res) => {
 };
 
 exports.getTasks = async (req, res) => {
+  const { status, priority, search, from, to } = req.query;
+
+  const filters = {
+    userId: req.userId,
+  };
+
+  // Filter by status
+  if (status) {
+    filters.status = status;
+  }
+
+  // Filter by priority
+  if (priority) {
+    filters.priority = priority;
+  }
+
+  // Search in title or description
+  if (search) {
+    filters.OR = [
+      { title: { contains: search } },
+      { description: { contains: search } },
+    ];
+  }
+
+  // Deadline range filter
+  if (from || to) {
+    filters.deadline = {};
+    if (from) filters.deadline.gte = new Date(from);
+    if (to) filters.deadline.lte = new Date(to);
+  }
+
   const tasks = await prisma.task.findMany({
-    where: { userId: req.userId },
+    where: filters,
     orderBy: { createdAt: "desc" },
   });
 
   res.json(tasks);
 };
+
 
 exports.updateTask = async (req, res) => {
     const taskId = parseInt(req.params.id);
