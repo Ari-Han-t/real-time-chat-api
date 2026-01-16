@@ -71,6 +71,56 @@ exports.getOverview = async (req, res) => {
       ? Math.round((completedInRange / totalInRange) * 100)
       : null;
 
+      const completedTasksWithTime = await prisma.task.findMany({
+        where: {
+          userId,
+          status: "COMPLETED",
+        },
+        select: {
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+      
+      let avgCompletionTime = null;
+      
+      if (completedTasksWithTime.length > 0) {
+        const totalTime = completedTasksWithTime.reduce((sum, task) => {
+          return sum + (task.updatedAt - task.createdAt);
+        }, 0);
+      
+        avgCompletionTime = Math.round(
+          totalTime / completedTasksWithTime.length / (1000 * 60)
+        ); // minutes
+      }
+    
+      const priorities = await prisma.task.groupBy({
+        by: ["priority"],
+        where: { userId },
+        _count: true,
+        orderBy: {
+          _count: {
+            priority: "desc",
+          },
+        },
+      });
+      
+      const mostCommonPriority =
+        priorities.length > 0 ? priorities[0].priority : null;
+    
+        const sevenDaysAgo = new Date();
+sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+const trend = await prisma.task.groupBy({
+  by: ["createdAt"],
+  where: {
+    userId,
+    status: "COMPLETED",
+    updatedAt: { gte: sevenDaysAgo },
+  },
+  _count: true,
+});
+
   res.json({
     totalTasks,
     completedTasks,
@@ -84,5 +134,8 @@ exports.getOverview = async (req, res) => {
     completedInRange,
     totalInRange,
     completionRateInRange,
+    avgCompletionTimeMinutes: avgCompletionTime,
+  mostCommonPriority,
+  productivityTrendLast7Days: trend.length,
   });
 };
