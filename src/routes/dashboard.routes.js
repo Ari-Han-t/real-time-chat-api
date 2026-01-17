@@ -4,11 +4,7 @@ const auth = require("../middleware/auth.middleware");
 const allowRoles = require("../middleware/role.middleware");
 const { getOverview } = require("../controllers/dashboard.controller");
 
-router.get(
-  "/overview",
-  auth,
-  allowRoles(["ADMIN"]),
-  getOverview
-);
+router.get("/overview", auth, getOverview);
+
 
 module.exports = router;
