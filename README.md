@@ -1,303 +1,295 @@
-# Productivity Management Dashboard API
+# Real-Time Chat API
 
-A robust backend API for a productivity management system that empowers users to organize, track, and analyze their tasks efficiently. Built with a focus on clean architecture, security, and reliability.
+A real-time chat backend that enables secure one-to-one messaging using REST APIs and WebSockets.  
+Built with a focus on reliability, scalability, and clean backend architecture.
+
+This project supports authenticated users, persistent chat history, real-time message delivery, and advanced features like message editing, deletion, pagination, and rate limiting.
+
+---
 
 ## 📋 Overview
 
-This API provides a complete task management solution with advanced features including role-based access control, recurring task automation, productivity analytics, and comprehensive test coverage. It supports both individual users tracking their own productivity and admins viewing system-wide insights.
+The Real-Time Chat API allows users to:
+- Register and authenticate securely
+- Send and receive messages instantly
+- View complete chat history with pagination
+- Edit or delete their own messages
+- View and update their profile
+- Communicate securely using JWT-authenticated WebSockets
+
+---
 
 ## ✨ Key Features
 
-- **Authentication & Security**
-  - JWT-based authentication (register & login)
-  - Secure password hashing with bcrypt
-  - Token-based authorization
+### Authentication & Security
+- JWT-based authentication
+- Secure password hashing with bcrypt
+- Auth-protected REST APIs
+- JWT-authenticated WebSocket connections
 
-- **Task Management**
-  - Full CRUD operations for tasks
-  - Advanced filtering and search capabilities
-  - Priority-based task organization
-  - Status tracking (PENDING, IN_PROGRESS, COMPLETED)
-  - Deadline management with overdue detection
+### Messaging
+- One-to-one private messaging
+- Persistent message storage
+- Chat history retrieval with pagination
+- Accurate message timestamps
 
-- **Smart Automation**
-  - Recurring tasks (daily / weekly recurrence)
-  - Automatic task generation for recurring items
-  - Overdue task detection and tracking
+### Real-Time Communication
+- Instant message delivery via Socket.IO
+- User-scoped private rooms
+- Reliable DB-first message delivery
 
-- **Access Control & Analytics**
-  - Role-based access control (USER / ADMIN)
-  - User-level productivity dashboard
-  - Admin system-wide productivity analytics
-  - Detailed completion metrics and trends
+### Message Controls
+- Edit own messages
+- Delete messages for everyone (soft delete)
+- Edited and deleted message indicators
 
-- **Developer Experience**
-  - Automated database seeding
-  - Comprehensive integration test suite
-  - Centralized error handling
-  - Structured logging with Winston
+### User Management
+- View own profile
+- Update own profile details
+- Strict authorization enforcement
+
+### Performance & Safety
+- Rate limiting for auth and messaging endpoints
+- Centralized error handling
+- Structured logging with Winston
+
+---
 
 ## 🛠 Tech Stack
 
 | Component | Technology |
-|-----------|-----------|
-| **Runtime** | Node.js |
-| **Framework** | Express.js |
-| **Database** | SQLite with Prisma ORM |
-| **Authentication** | JWT |
-| **Password Hashing** | bcrypt |
-| **Logging** | Winston |
-| **Testing** | Jest & Supertest |
+|---------|------------|
+| Runtime | Node.js |
+| Framework | Express.js |
+| Real-Time | Socket.IO |
+| Database | SQLite (Prisma ORM) |
+| Authentication | JWT |
+| Logging | Winston |
+| Rate Limiting | express-rate-limit |
 
 ---
 
 ## 📦 Getting Started
 
 ### Prerequisites
-- Node.js (v16 or higher)
-- npm or yarn
+- Node.js (v16+)
+- npm
 
 ### Installation
 
-1. **Clone the repository**
 ```bash
 git clone <repository-url>
 cd GDG-BACKEND-REPO-Arihant_Gupta
-```
-
-2. **Install dependencies**
-```bash
+git checkout task-2-chat-api
 npm install
 ```
 
-3. **Configure environment variables**
+### Environment Variables
 
-Create a .env file in the root directory:
+Create a `.env` file:
 
 ```env
 PORT=5000
-JWT_SECRET=your_super_secret_key_here
+JWT_SECRET=your_secret_key
 DATABASE_URL="file:./dev.db"
 ```
 
-4. **Set up the database**
+### Database Setup
+
 ```bash
 npx prisma migrate dev
-```
-
-5. **Seed the database (optional)**
-```bash
 node src/scripts/seed.js
 ```
 
-This creates 5 test users (1 admin, 4 regular users) with 10 sample tasks each.
+### Start Server
 
-6. **Start the server**
 ```bash
 npm run dev
 ```
 
-The API will be available at http://localhost:5000/api
+**Base URL:**
+
+```
+http://localhost:5000/api
+```
 
 ## 🔐 Authentication
 
-All protected routes require a valid JWT token in the request header:
+All protected routes require a JWT token:
 
+```
 Authorization: Bearer <JWT_TOKEN>
+```
 
+## 📚 REST API Documentation
 
-Tokens expire after 7 days.
+### Authentication
 
-## 📚 API Documentation
+#### Register
 
-### Base URL
-http://localhost:5000/api
-
-### Authentication Endpoints
-
-#### Register a New User
+```http
 POST /api/auth/register
-Content-Type: application/json
+```
+
+**Request:**
 
 ```json
 {
   "email": "user@example.com",
   "password": "password123"
-}
-```
-
-Response (201 Created):
-
-```json
-{
-  "message": "User registered successfully"
 }
 ```
 
 #### Login
+
+```http
 POST /api/auth/login
-Content-Type: application/json
+```
+
+**Response:**
 
 ```json
 {
-  "email": "user@example.com",
-  "password": "password123"
+  "token": "jwt_token_here"
 }
 ```
 
-Response (200 OK):
+### 👤 User Profile
+
+#### Get Own Profile
+
+```http
+GET /api/users/me
+```
+
+#### Update Own Profile
+
+```http
+PUT /api/users/me
+```
+
+**Request:**
 
 ```json
 {
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  "email": "newemail@example.com"
 }
 ```
 
-### 📝 Task Management Endpoints
+### 💬 Messaging
 
-#### Create a Task
-POST /api/tasks
-Authorization: Bearer <JWT_TOKEN>
-Content-Type: application/json
+#### Send Message
+
+```http
+POST /api/messages
+```
+
+**Request:**
 
 ```json
 {
-  "title": "Finish backend implementation",
-  "description": "Complete API endpoints",
-  "priority": "HIGH",
-  "deadline": "2026-01-20",
-  "recurrence": "DAILY"
+  "receiverId": 2,
+  "content": "Hello there!"
 }
 ```
 
-#### Get All Tasks
-GET /api/tasks?status=PENDING&priority=HIGH&search=backend
-Authorization: Bearer <JWT_TOKEN>
+#### Get Conversation (Paginated)
 
-Query Parameters:
+```http
+GET /api/messages/:userId?page=1&limit=20
+```
 
-| Parameter | Values | Description |
-|-----------|--------|-------------|
-| status | PENDING, IN_PROGRESS, COMPLETED | Filter by task status |
-| priority | LOW, MEDIUM, HIGH | Filter by priority |
-| search | string | Search in task titles & descriptions |
-| from | date (YYYY-MM-DD) | Deadline start |
-| to | date (YYYY-MM-DD) | Deadline end |
-
-#### Update a Task
-PUT /api/tasks/:id
-Authorization: Bearer <JWT_TOKEN>
-Content-Type: application/json
+**Response:**
 
 ```json
 {
-  "status": "COMPLETED",
-  "priority": "MEDIUM"
+  "page": 1,
+  "limit": 20,
+  "totalMessages": 45,
+  "totalPages": 3,
+  "messages": [...]
 }
 ```
 
-For recurring tasks, marking a task as COMPLETED automatically creates the next occurrence.
-## 🔁 Special Task Features
+#### Edit Message
 
-### Recurring Tasks
+```http
+PUT /api/messages/:id
+```
 
-Tasks can recur automatically:
-
-| Type | Behavior |
-|------|----------|
-| DAILY | Deadline +1 day |
-| WEEKLY | Deadline +7 days |
-
-### Overdue Detection
-
-A task is marked overdue when:
-- The deadline has passed
-- The task status is not COMPLETED
-
-## 📊 Dashboard Endpoints
-
-### Productivity Overview (User & Admin)
-GET /api/dashboard/overview
-Authorization: Bearer <JWT_TOKEN>
-
-Behavior by role:
-- USER → sees analytics for their own tasks only
-- ADMIN → sees system-wide analytics across all users
-
-Query Parameters:
-
-| Parameter | Values | Description |
-|-----------|--------|-------------|
-| range | day, week, month | Time window |
-| from | date | Custom start date |
-| to | date | Custom end date |
-
-Example Response (User):
+**Request:**
 
 ```json
 {
-  "scope": "USER",
-  "totalTasks": 10,
-  "completedTasks": 4,
-  "overdueTasks": 2,
-  "completionRateAllTime": 40
+  "content": "Updated message"
 }
 ```
 
-Example Response (Admin):
+#### Delete Message (Delete for Everyone)
+
+```http
+DELETE /api/messages/:id
+```
+
+**Deleted messages appear as:**
+
+```
+"This message was deleted"
+```
+
+## 🔌 WebSocket Documentation
+
+### Connection
+
+```javascript
+const socket = io("http://localhost:5000", {
+  auth: {
+    token: "<JWT_TOKEN>"
+  }
+});
+```
+
+### Events
+
+#### receive_message
+
+Emitted when a new message is received in real time.
 
 ```json
 {
-  "scope": "SYSTEM",
-  "totalTasks": 50,
-  "completedTasks": 18,
-  "overdueTasks": 6,
-  "completionRateAllTime": 36
+  "id": 12,
+  "senderId": 1,
+  "receiverId": 2,
+  "content": "Hello!",
+  "createdAt": "2026-01-17T13:00:00Z"
 }
 ```
 
-### Admin: View All Tasks
-GET /api/tasks/admin/all
-Authorization: Bearer <ADMIN_TOKEN>
+### Room Model
 
-## 👥 Role-Based Access Control
+Each user automatically joins a private room:
 
-| Role | Permissions |
-|------|-------------|
-| USER | Manage own tasks<br/>View personal dashboard |
-| ADMIN | View all tasks<br/>Access system-wide analytics |
+```
+user:<userId>
+```
+
+Messages are emitted to the receiver's room for secure delivery.
+
+## 🛡 Rate Limiting
+
+| Endpoint | Limit |
+|----------|-------|
+| Auth | 20 requests / 15 min |
+| Messages | 30 messages / minute |
 
 ## 🧪 Testing
 
-Integration tests cover:
-- Authentication
-- Authorization & RBAC
-- Task CRUD
-- Filters & search
-- User and admin dashboard behavior
+Manual testing recommended for:
 
-Run tests:
-```bash
-NODE_ENV=test npm test
-```
+- WebSocket connections
+- Real-time message delivery
 
-## 🌱 Database Seeding
-
-```bash
-node src/scripts/seed.js
-```
-
-Creates:
-- 5 users (1 admin, 4 users)
-- 10 tasks per user
-- Password for all users: password123
-
-## 🛡️ Error Handling & Logging
-
-- Centralized error middleware
-- Structured logging with Winston
-- Input validation before processing
-- Secure handling of sensitive data
+REST endpoints can be verified using Postman or curl.
 
 ## 📄 License
 
@@ -307,6 +299,4 @@ ISC
 
 Arihant Gupta
 
-Status: ✅ Task 1 complete — all required and optional features implemented
-
----
+**Status:** ✅ Task 2 completed with all core features and multiple brownie-point enhancements
