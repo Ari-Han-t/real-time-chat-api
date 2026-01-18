@@ -35,18 +35,39 @@ exports.sendMessage = async (req, res) => {
   };
   
   
-exports.getConversation = async (req, res) => {
-  const otherUserId = parseInt(req.params.userId);
-
-  const messages = await prisma.message.findMany({
-    where: {
-      OR: [
-        { senderId: req.userId, receiverId: otherUserId },
-        { senderId: otherUserId, receiverId: req.userId },
-      ],
-    },
-    orderBy: { createdAt: "asc" },
-  });
-
-  res.json(messages);
-};
+  exports.getConversation = async (req, res) => {
+    const otherUserId = Number(req.params.userId);
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+  
+    const messages = await prisma.message.findMany({
+      where: {
+        OR: [
+          { senderId: req.userId, receiverId: otherUserId },
+          { senderId: otherUserId, receiverId: req.userId },
+        ],
+      },
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: limit,
+    });
+  
+    const totalMessages = await prisma.message.count({
+      where: {
+        OR: [
+          { senderId: req.userId, receiverId: otherUserId },
+          { senderId: otherUserId, receiverId: req.userId },
+        ],
+      },
+    });
+  
+    res.json({
+      page,
+      limit,
+      totalMessages,
+      totalPages: Math.ceil(totalMessages / limit),
+      messages: messages.reverse(), // chronological order
+    });
+  };
+  
