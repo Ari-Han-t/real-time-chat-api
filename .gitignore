@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv/
+venv/
+backend/*.db
+backend/uploads/messages/*
+backend/uploads/profile_pics/*
+!backend/uploads/messages/.gitkeep
+!backend/uploads/profile_pics/.gitkeep
