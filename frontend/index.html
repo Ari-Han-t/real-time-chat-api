@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Real-Time Chat</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div id="auth-view" class="page">
+    <div class="auth-card">
+      <h1>Real-Time Chat</h1>
+      <p class="sub">Sign in or create your account</p>
+
+      <div class="tabs">
+        <button id="tab-login" class="tab active">Login</button>
+        <button id="tab-register" class="tab">Register</button>
+      </div>
+
+      <form id="login-form" class="form">
+        <label>Username</label>
+        <input id="login-username" required />
+        <label>Password</label>
+        <input id="login-password" type="password" required />
+        <button type="submit">Login</button>
+      </form>
+
+      <form id="register-form" class="form hidden">
+        <label>Name</label>
+        <input id="register-name" required />
+        <label>Username</label>
+        <input id="register-username" required />
+        <label>Password</label>
+        <input id="register-password" type="password" required />
+        <button type="submit">Create Account</button>
+      </form>
+
+      <p id="auth-error" class="error"></p>
+    </div>
+  </div>
+
+  <div id="chat-view" class="page hidden">
+    <aside class="sidebar">
+      <div class="profile-block">
+        <div class="avatar-wrap">
+          <img id="me-avatar" class="avatar" src="" alt="profile" />
+        </div>
+        <div class="profile-text">
+          <h3 id="me-name"></h3>
+          <p id="me-username"></p>
+        </div>
+      </div>
+
+      <form id="profile-form" class="small-form">
+        <input id="profile-name" placeholder="Update name" />
+        <input id="profile-bio" placeholder="Update bio" maxlength="255" />
+        <input id="profile-file" type="file" accept=".jpg,.jpeg,.png,.webp" />
+        <button type="submit">Save Profile</button>
+      </form>
+
+      <hr />
+
+      <div class="search-row">
+        <input id="user-search" placeholder="Search users..." />
+        <button id="search-btn">Search</button>
+      </div>
+      <div id="search-results" class="list"></div>
+
+      <h4 class="list-title">Chats</h4>
+      <div id="chat-list" class="list"></div>
+
+      <button id="logout-btn" class="danger">Logout</button>
+    </aside>
+
+    <main class="main">
+      <header class="chat-header">
+        <h2 id="chat-title">Select a chat</h2>
+      </header>
+
+      <section id="messages" class="messages"></section>
+
+      <form id="send-form" class="composer">
+        <input id="message-text" placeholder="Type a message..." />
+        <input id="message-file" type="file" />
+        <button type="submit">Send</button>
+      </form>
+      <p class="hint">Allowed: image/video/docs/ppt/word etc, max 2 MB per file.</p>
+    </main>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

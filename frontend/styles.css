@@ -1,0 +1,273 @@
+:root {
+  --bg: #f4f7fb;
+  --panel: #ffffff;
+  --ink: #13213a;
+  --muted: #5d6b84;
+  --brand: #1274ff;
+  --line: #dde4f1;
+  --danger: #d43d3d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: linear-gradient(180deg, #edf3ff 0%, #f8fbff 45%, #f4f7fb 100%);
+  color: var(--ink);
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.page {
+  min-height: 100vh;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.auth-card {
+  width: min(420px, 92vw);
+  margin: 9vh auto;
+  padding: 24px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 16px;
+  box-shadow: 0 18px 45px rgba(18, 38, 85, 0.12);
+}
+
+.auth-card h1 {
+  margin: 0;
+}
+
+.sub {
+  color: var(--muted);
+  margin: 8px 0 18px;
+}
+
+.tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.tab {
+  flex: 1;
+  border: 1px solid var(--line);
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f7f9fd;
+  cursor: pointer;
+}
+
+.tab.active {
+  border-color: var(--brand);
+  background: #e9f1ff;
+  color: #0c58ca;
+}
+
+.form {
+  display: grid;
+  gap: 8px;
+}
+
+label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+input {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+button {
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--brand);
+  color: #fff;
+}
+
+.error {
+  min-height: 20px;
+  color: var(--danger);
+  margin: 12px 0 0;
+}
+
+#chat-view {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+}
+
+.sidebar {
+  height: 100vh;
+  padding: 16px;
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+  overflow-y: auto;
+}
+
+.profile-block {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.avatar {
+  width: 54px;
+  height: 54px;
+  object-fit: cover;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: #eef3fb;
+}
+
+.profile-text h3,
+.profile-text p {
+  margin: 0;
+}
+
+.profile-text p {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.small-form {
+  margin-top: 14px;
+  display: grid;
+  gap: 8px;
+}
+
+hr {
+  border: none;
+  border-top: 1px solid var(--line);
+  margin: 16px 0;
+}
+
+.search-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.list-title {
+  margin: 14px 0 8px;
+}
+
+.list {
+  display: grid;
+  gap: 8px;
+}
+
+.list-item {
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #f8fbff;
+}
+
+.list-item button {
+  margin-top: 8px;
+  width: 100%;
+}
+
+.list-item.active {
+  border-color: var(--brand);
+  background: #eef5ff;
+}
+
+.danger {
+  background: #b32121;
+  margin-top: 16px;
+}
+
+.main {
+  height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+}
+
+.chat-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+  background: #fafdff;
+}
+
+.chat-header h2 {
+  margin: 0;
+}
+
+.messages {
+  padding: 14px 16px;
+  overflow-y: auto;
+  display: grid;
+  gap: 10px;
+}
+
+.msg {
+  max-width: min(76%, 760px);
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #fff;
+  justify-self: start;
+}
+
+.msg.mine {
+  justify-self: end;
+  background: #eaf3ff;
+  border-color: #cfe0ff;
+}
+
+.msg .meta {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.msg .text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.msg img.preview {
+  margin-top: 8px;
+  max-width: 220px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+}
+
+.composer {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--line);
+  background: #fff;
+}
+
+.hint {
+  margin: 0;
+  padding: 0 12px 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+@media (max-width: 980px) {
+  #chat-view {
+    grid-template-columns: 1fr;
+  }
+  .sidebar {
+    height: auto;
+  }
+  .main {
+    height: calc(100vh - 580px);
+    min-height: 420px;
+  }
+}
