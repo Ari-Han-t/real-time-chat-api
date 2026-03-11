@@ -10,5 +10,7 @@ backend/seed_users.csv
 backend/seed_chats_to_reply.csv
 backend/uploads/messages/*
 backend/uploads/profile_pics/*
+deploy/nginx/certs/*.pem
 !backend/uploads/messages/.gitkeep
 !backend/uploads/profile_pics/.gitkeep
+!deploy/nginx/certs/.gitkeep

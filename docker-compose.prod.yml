@@ -1,0 +1,56 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES}
+      FRONTEND_DIR: /app/frontend
+      MAX_MESSAGE_CHARS: ${MAX_MESSAGE_CHARS}
+      MAX_LINKS_PER_MESSAGE: ${MAX_LINKS_PER_MESSAGE}
+      MAX_REPEAT_CHARS: ${MAX_REPEAT_CHARS}
+      MESSAGE_RATE_LIMIT_COUNT: ${MESSAGE_RATE_LIMIT_COUNT}
+      MESSAGE_RATE_LIMIT_WINDOW_SECONDS: ${MESSAGE_RATE_LIMIT_WINDOW_SECONDS}
+      FILE_RATE_LIMIT_COUNT: ${FILE_RATE_LIMIT_COUNT}
+      FILE_RATE_LIMIT_WINDOW_SECONDS: ${FILE_RATE_LIMIT_WINDOW_SECONDS}
+      BANNED_TERMS: ${BANNED_TERMS}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend/uploads:/app/uploads
+    expose:
+      - "8000"
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.27-alpine
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx/conf.d/chat.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./deploy/nginx/certs:/etc/nginx/certs:ro
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

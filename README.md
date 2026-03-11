@@ -1,83 +1,120 @@
-# Real-Time Chat Application
+# Real-Time Chat API
 
-Production-style full stack chat app with:
+Full-stack chat application with a FastAPI backend, SQL database, WebSocket real-time events, and a browser frontend.
 
-- FastAPI backend
-- PostgreSQL (or SQLite for local quick start)
-- JWT authentication
-- Real-time updates using WebSockets
-- Direct messaging
-- Text + attachment messages
-- Profile management (name, bio, profile picture)
-- 2 MB hard upload limit
+## Features
 
-## Supported Attachments
+- JWT auth (register/login)
+- User profile management (name, bio, profile picture)
+- Direct chats
+- Text + attachment messaging (2 MB max)
+- Real-time message delivery
+- Typing indicators
+- Read receipts
+- Message edit/delete with ownership checks
+- Message pagination + infinite scroll UI
+- Rate limiting and moderation guards on messaging
 
-Message attachments support:
+## Attachment Support
+
+Allowed file extensions:
 
 - Images: `.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`
 - Videos: `.mp4`, `.mov`, `.webm`, `.mkv`
-- Documents: `.pdf`, `.doc`, `.docx`, `.ppt`, `.pptx`, `.xls`, `.xlsx`, `.txt`, `.csv`
+- Docs: `.pdf`, `.doc`, `.docx`, `.ppt`, `.pptx`, `.xls`, `.xlsx`, `.txt`, `.csv`
 
-Every upload is validated for:
+Validation:
 
-- Allowed extension
 - Size <= 2 MB
-- Non-empty content
+- Allowed extension only
+- Non-empty upload
 
-## Project Layout
+## Project Structure
 
 ```text
-chat_fullstack/
-  backend/
-    app/
-      routers/
-      config.py
-      database.py
-      models.py
-      main.py
-    uploads/
-    requirements.txt
-    Dockerfile
-  frontend/
-    index.html
-    styles.css
-    app.js
-  docker-compose.yml
+backend/
+  app/
+    routers/
+    config.py
+    database.py
+    models.py
+    main.py
+  scripts/
+  uploads/
+  requirements.txt
+  Dockerfile
+frontend/
+  index.html
+  styles.css
+  app.js
+deploy/
+  nginx/
+docker-compose.yml
+docker-compose.prod.yml
 ```
 
-## Run Locally (No Docker)
+## Local Run (Python)
 
-From `chat_fullstack/backend`:
+From repo root:
 
 ```bash
+cd backend
 python -m pip install -r requirements.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Then open:
+Open:
 
 ```text
 http://localhost:8000
 ```
 
-By default this uses a local SQLite file at `backend/chat_app.db`.
+Default local DB: `backend/chat_app.db` (SQLite).
 
-## Run With Docker (PostgreSQL + Backend)
+## Local Run (Docker Dev)
 
-From `chat_fullstack`:
+From repo root:
 
 ```bash
 docker compose up --build
 ```
 
-Then open:
+Open:
 
 ```text
 http://localhost:8000
 ```
 
-## API Overview
+## Production Run (Nginx + HTTPS + Postgres)
+
+1. Copy env template:
+
+```bash
+cp .env.prod.example .env
+```
+
+2. Set strong secrets and DB credentials in `.env`.
+
+3. Put certificate files in:
+
+```text
+deploy/nginx/certs/fullchain.pem
+deploy/nginx/certs/privkey.pem
+```
+
+4. Update `server_name` in:
+
+```text
+deploy/nginx/conf.d/chat.conf
+```
+
+5. Start stack:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env up -d --build
+```
+
+## API Endpoints
 
 - `POST /api/auth/register`
 - `POST /api/auth/login`
@@ -87,13 +124,23 @@ http://localhost:8000
 - `GET /api/users/search?q=<query>`
 - `POST /api/chats/direct/{other_user_id}`
 - `GET /api/chats`
-- `GET /api/chats/{chat_id}/messages`
+- `GET /api/chats/{chat_id}/messages?limit=&before_id=`
 - `POST /api/chats/{chat_id}/messages`
+- `PATCH /api/chats/{chat_id}/messages/{message_id}`
+- `DELETE /api/chats/{chat_id}/messages/{message_id}`
+- `POST /api/chats/{chat_id}/read`
 - `WS /ws/chats/{chat_id}?token=<jwt>`
 
-## Deployment Notes
+## Fake Data Seeder
 
-- Set strong `JWT_SECRET_KEY`.
-- Use managed PostgreSQL by setting `DATABASE_URL`.
-- Persist `backend/uploads` volume to retain media files.
-- Put reverse proxy (Nginx/Caddy) in front of API for TLS in production.
+Generate 100 fake users + reply-ready chats:
+
+```bash
+cd backend
+PYTHONPATH=. python scripts/seed_fake_data.py
+```
+
+Outputs:
+
+- `backend/seed_users.csv`
+- `backend/seed_chats_to_reply.csv`
