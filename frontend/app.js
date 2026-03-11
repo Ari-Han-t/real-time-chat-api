@@ -1,3 +1,7 @@
+const PAGE_SIZE = 30;
+const TYPING_STOP_DELAY_MS = 1200;
+const TYPING_EXPIRE_MS = 2000;
+
 const state = {
   token: localStorage.getItem("chat_token") || "",
   me: null,
@@ -5,6 +9,17 @@ const state = {
   activeChatId: null,
   activeChat: null,
   ws: null,
+  chatMemberMap: {},
+  messageOrder: [],
+  messageById: new Map(),
+  oldestMessageId: null,
+  hasMoreMessages: true,
+  loadingOlderMessages: false,
+  lastReadMessageId: 0,
+  typingUsers: new Map(),
+  typingTimeouts: new Map(),
+  typingActive: false,
+  typingStopTimer: null,
 };
 
 const ui = {
@@ -34,6 +49,7 @@ const ui = {
   chatList: document.getElementById("chat-list"),
   chatTitle: document.getElementById("chat-title"),
   messages: document.getElementById("messages"),
+  typingIndicator: document.getElementById("typing-indicator"),
   sendForm: document.getElementById("send-form"),
   messageText: document.getElementById("message-text"),
   messageFile: document.getElementById("message-file"),
@@ -84,20 +100,15 @@ function avatarUrl(user) {
   return user?.profile_picture_url || "https://placehold.co/96x96/eef3fb/335?text=PFP";
 }
 
-async function bootstrap() {
-  if (!state.token) {
-    showAuth();
-    return;
-  }
-  try {
-    state.me = await api("/api/users/me");
-    renderMe();
-    showChat();
-    await loadChats();
-  } catch {
-    clearToken();
-    showAuth();
-  }
+function formatTime(iso) {
+  if (!iso) return "";
+  return new Date(iso).toLocaleString();
+}
+
+function chatDisplayName(chat) {
+  if (chat.title) return chat.title;
+  const other = chat.members.find((m) => m.id !== state.me.id);
+  return other ? `${other.name} (@${other.username})` : "Direct Chat";
 }
 
 function renderMe() {
@@ -109,16 +120,78 @@ function renderMe() {
   ui.profileBio.value = state.me.bio || "";
 }
 
-function formatTime(iso) {
-  if (!iso) return "";
-  const dt = new Date(iso);
-  return dt.toLocaleString();
+function isNearBottom() {
+  return ui.messages.scrollHeight - ui.messages.scrollTop - ui.messages.clientHeight < 100;
 }
 
-function chatDisplayName(chat) {
-  if (chat.title) return chat.title;
-  const other = chat.members.find((m) => m.id !== state.me.id);
-  return other ? `${other.name} (@${other.username})` : "Direct Chat";
+function getReadLabel(message) {
+  if (!state.activeChat || message.sender_id !== state.me.id || message.is_deleted) return "";
+  const memberCount = state.activeChat.members.length;
+  const readers = (message.read_by_user_ids || []).filter((id) => id !== message.sender_id);
+  if (!readers.length) return "Sent";
+  if (memberCount <= 2) return "Read";
+  return `Read by ${readers.length}`;
+}
+
+function senderNameForMessage(message) {
+  if (message.sender_id === state.me.id) return "You";
+  return state.chatMemberMap[message.sender_id]?.name || `User #${message.sender_id}`;
+}
+
+function buildMessageElement(message) {
+  const mine = message.sender_id === state.me.id;
+  const wrapper = document.createElement("div");
+  wrapper.className = "msg" + (mine ? " mine" : "") + (message.is_deleted ? " deleted" : "");
+  wrapper.dataset.messageId = String(message.id);
+  wrapper.dataset.senderId = String(message.sender_id);
+
+  const editedText = message.is_edited ? " (edited)" : "";
+  const textHtml = message.is_deleted
+    ? `<div class="text">This message was deleted.</div>`
+    : (message.text ? `<div class="text"></div>` : "");
+
+  let attachmentBlock = "";
+  if (!message.is_deleted && message.attachment_url) {
+    const isImage = (message.attachment_mime || "").startsWith("image/");
+    attachmentBlock = `
+      <div><a href="${message.attachment_url}" target="_blank" rel="noopener">📎 ${message.attachment_name || "Attachment"}</a></div>
+      ${isImage ? `<img class="preview" src="${message.attachment_url}" alt="attachment"/>` : ""}
+    `;
+  }
+
+  const actionHtml =
+    mine && !message.is_deleted
+      ? `<div class="actions">
+          <button class="edit" type="button">Edit</button>
+          <button class="delete" type="button">Delete</button>
+        </div>`
+      : "";
+
+  const receiptText = getReadLabel(message);
+  wrapper.innerHTML = `
+    <div class="meta">${senderNameForMessage(message)} - ${formatTime(message.created_at)}${editedText}</div>
+    ${textHtml}
+    ${attachmentBlock}
+    ${actionHtml}
+    ${mine ? `<div class="receipt">${receiptText}</div>` : ""}
+  `;
+
+  if (!message.is_deleted && message.text) {
+    wrapper.querySelector(".text").textContent = message.text;
+  }
+
+  if (mine && !message.is_deleted) {
+    const editBtn = wrapper.querySelector(".edit");
+    const deleteBtn = wrapper.querySelector(".delete");
+    if (editBtn) {
+      editBtn.addEventListener("click", () => handleEditMessage(message.id));
+    }
+    if (deleteBtn) {
+      deleteBtn.addEventListener("click", () => handleDeleteMessage(message.id));
+    }
+  }
+
+  return wrapper;
 }
 
 function renderChats() {
@@ -142,11 +215,235 @@ function renderChats() {
 
 async function loadChats() {
   state.chats = await api("/api/chats");
-  renderChats();
   if (state.activeChatId) {
-    const found = state.chats.find((c) => c.id === state.activeChatId);
-    if (found) await selectChat(found.id);
+    state.activeChat = state.chats.find((c) => c.id === state.activeChatId) || null;
+    if (!state.activeChat) {
+      state.activeChatId = null;
+    }
   }
+  renderChats();
+}
+
+function resetActiveMessages() {
+  state.messageOrder = [];
+  state.messageById = new Map();
+  state.oldestMessageId = null;
+  state.hasMoreMessages = true;
+  state.loadingOlderMessages = false;
+  state.lastReadMessageId = 0;
+  ui.messages.innerHTML = "";
+}
+
+function renderTypingIndicator() {
+  if (!state.typingUsers.size) {
+    ui.typingIndicator.textContent = "";
+    return;
+  }
+  const names = Array.from(state.typingUsers.keys()).map((userId) => state.chatMemberMap[userId]?.name || "Someone");
+  ui.typingIndicator.textContent = `${names.join(", ")} ${names.length > 1 ? "are" : "is"} typing...`;
+}
+
+function clearTypingState() {
+  for (const timeoutId of state.typingTimeouts.values()) {
+    clearTimeout(timeoutId);
+  }
+  state.typingUsers.clear();
+  state.typingTimeouts.clear();
+  renderTypingIndicator();
+}
+
+function applyTypingEvent(payload) {
+  if (!state.activeChat || payload.chat_id !== state.activeChatId || payload.user_id === state.me.id) return;
+  if (!payload.is_typing) {
+    state.typingUsers.delete(payload.user_id);
+    if (state.typingTimeouts.has(payload.user_id)) {
+      clearTimeout(state.typingTimeouts.get(payload.user_id));
+      state.typingTimeouts.delete(payload.user_id);
+    }
+    renderTypingIndicator();
+    return;
+  }
+
+  state.typingUsers.set(payload.user_id, Date.now());
+  if (state.typingTimeouts.has(payload.user_id)) {
+    clearTimeout(state.typingTimeouts.get(payload.user_id));
+  }
+  const timeoutId = setTimeout(() => {
+    state.typingUsers.delete(payload.user_id);
+    state.typingTimeouts.delete(payload.user_id);
+    renderTypingIndicator();
+  }, TYPING_EXPIRE_MS);
+  state.typingTimeouts.set(payload.user_id, timeoutId);
+  renderTypingIndicator();
+}
+
+function sendTyping(isTyping) {
+  if (!state.ws || state.ws.readyState !== WebSocket.OPEN || !state.activeChatId) return;
+  state.ws.send(JSON.stringify({ type: "typing", is_typing: isTyping }));
+}
+
+function stopTyping() {
+  if (state.typingActive) {
+    sendTyping(false);
+    state.typingActive = false;
+  }
+  if (state.typingStopTimer) {
+    clearTimeout(state.typingStopTimer);
+    state.typingStopTimer = null;
+  }
+}
+
+function upsertMessage(message, options = {}) {
+  const { prepend = false, forceScroll = false } = options;
+  const existed = state.messageById.has(message.id);
+  state.messageById.set(message.id, message);
+
+  if (existed) {
+    const oldElement = ui.messages.querySelector(`[data-message-id="${message.id}"]`);
+    const newElement = buildMessageElement(message);
+    if (oldElement) oldElement.replaceWith(newElement);
+  } else {
+    if (prepend) state.messageOrder.unshift(message.id);
+    else state.messageOrder.push(message.id);
+
+    const element = buildMessageElement(message);
+    if (prepend && ui.messages.firstChild) ui.messages.insertBefore(element, ui.messages.firstChild);
+    else ui.messages.appendChild(element);
+  }
+
+  if (state.messageOrder.length > 0) state.oldestMessageId = state.messageOrder[0];
+  if (forceScroll) ui.messages.scrollTop = ui.messages.scrollHeight;
+}
+
+function applyReadEvent(payload) {
+  if (payload.chat_id !== state.activeChatId) return;
+  let changed = false;
+  for (const id of state.messageOrder) {
+    if (id > payload.last_message_id) break;
+    const msg = state.messageById.get(id);
+    if (!msg || msg.sender_id !== state.me.id) continue;
+    const readSet = new Set(msg.read_by_user_ids || []);
+    if (!readSet.has(payload.user_id)) {
+      readSet.add(payload.user_id);
+      msg.read_by_user_ids = Array.from(readSet).sort((a, b) => a - b);
+      state.messageById.set(id, msg);
+      changed = true;
+    }
+  }
+  if (!changed) return;
+
+  for (const id of state.messageOrder) {
+    const msg = state.messageById.get(id);
+    if (!msg || msg.sender_id !== state.me.id) continue;
+    const element = ui.messages.querySelector(`[data-message-id="${id}"]`);
+    if (!element) continue;
+    const receipt = element.querySelector(".receipt");
+    if (receipt) receipt.textContent = getReadLabel(msg);
+  }
+}
+
+function closeSocket() {
+  if (state.ws) {
+    state.ws.close();
+    state.ws = null;
+  }
+}
+
+function openSocket(chatId) {
+  closeSocket();
+  const proto = window.location.protocol === "https:" ? "wss" : "ws";
+  const wsUrl = `${proto}://${window.location.host}/ws/chats/${chatId}?token=${encodeURIComponent(state.token)}`;
+  const ws = new WebSocket(wsUrl);
+  ws.onmessage = async (event) => {
+    const payload = JSON.parse(event.data);
+    if (payload.type === "typing") {
+      applyTypingEvent(payload);
+      return;
+    }
+    if (payload.type === "messages_read") {
+      applyReadEvent(payload);
+      await loadChats().catch(() => {});
+      return;
+    }
+    if (payload.chat_id !== state.activeChatId) {
+      await loadChats().catch(() => {});
+      return;
+    }
+
+    if (payload.type === "new_message" && payload.message) {
+      const shouldScroll = isNearBottom() || payload.message.sender_id === state.me.id;
+      upsertMessage(payload.message, { prepend: false, forceScroll: shouldScroll });
+      if (payload.message.sender_id !== state.me.id) {
+        await markReadUpToLatest().catch(() => {});
+      }
+    } else if ((payload.type === "message_updated" || payload.type === "message_deleted") && payload.message) {
+      upsertMessage(payload.message, { prepend: false, forceScroll: false });
+    }
+    await loadChats().catch(() => {});
+  };
+  state.ws = ws;
+}
+
+async function markReadUpToLatest() {
+  if (!state.activeChatId || !state.messageOrder.length) return;
+  const latestId = state.messageOrder[state.messageOrder.length - 1];
+  if (latestId <= state.lastReadMessageId) return;
+  await api(`/api/chats/${state.activeChatId}/read`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ last_message_id: latestId }),
+  });
+  state.lastReadMessageId = latestId;
+}
+
+async function loadMessagePage({ beforeId = null, prepend = false } = {}) {
+  if (!state.activeChatId) return;
+  const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
+  if (beforeId) params.set("before_id", String(beforeId));
+  const data = await api(`/api/chats/${state.activeChatId}/messages?${params.toString()}`);
+  if (!Array.isArray(data) || data.length === 0) {
+    if (prepend) state.hasMoreMessages = false;
+    return;
+  }
+
+  if (prepend) {
+    const prevHeight = ui.messages.scrollHeight;
+    for (let i = data.length - 1; i >= 0; i--) {
+      if (!state.messageById.has(data[i].id)) upsertMessage(data[i], { prepend: true });
+    }
+    const newHeight = ui.messages.scrollHeight;
+    ui.messages.scrollTop = newHeight - prevHeight;
+  } else {
+    for (const msg of data) {
+      if (!state.messageById.has(msg.id)) upsertMessage(msg, { prepend: false });
+    }
+    ui.messages.scrollTop = ui.messages.scrollHeight;
+  }
+  state.hasMoreMessages = data.length === PAGE_SIZE;
+}
+
+async function loadOlderMessagesIfNeeded() {
+  if (!state.activeChatId || !state.hasMoreMessages || state.loadingOlderMessages || !state.oldestMessageId) return;
+  state.loadingOlderMessages = true;
+  try {
+    await loadMessagePage({ beforeId: state.oldestMessageId, prepend: true });
+  } finally {
+    state.loadingOlderMessages = false;
+  }
+}
+
+async function selectChat(chatId) {
+  state.activeChatId = chatId;
+  state.activeChat = state.chats.find((c) => c.id === chatId) || null;
+  state.chatMemberMap = Object.fromEntries((state.activeChat?.members || []).map((m) => [m.id, m]));
+  ui.chatTitle.textContent = state.activeChat ? chatDisplayName(state.activeChat) : "Chat";
+  renderChats();
+  clearTypingState();
+  stopTyping();
+  resetActiveMessages();
+  openSocket(chatId);
+  await loadMessagePage();
+  await markReadUpToLatest().catch(() => {});
 }
 
 function renderSearchResults(users) {
@@ -172,69 +469,41 @@ function renderSearchResults(users) {
   }
 }
 
-function closeSocket() {
-  if (state.ws) {
-    state.ws.close();
-    state.ws = null;
+async function handleEditMessage(messageId) {
+  const current = state.messageById.get(messageId);
+  if (!current || current.is_deleted) return;
+  const edited = window.prompt("Edit message:", current.text || "");
+  if (edited === null) return;
+  const nextText = edited.trim();
+  if (!nextText) {
+    alert("Message cannot be empty.");
+    return;
   }
+  await api(`/api/chats/${state.activeChatId}/messages/${messageId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text: nextText }),
+  });
 }
 
-function openSocket(chatId) {
-  closeSocket();
-  const proto = window.location.protocol === "https:" ? "wss" : "ws";
-  const wsUrl = `${proto}://${window.location.host}/ws/chats/${chatId}?token=${encodeURIComponent(state.token)}`;
-  const ws = new WebSocket(wsUrl);
-  ws.onmessage = (event) => {
-    const payload = JSON.parse(event.data);
-    if (payload.type === "new_message" && payload.chat_id === state.activeChatId) {
-      appendMessage(payload.message, payload.sender);
-    }
-    loadChats().catch(() => {});
-  };
-  state.ws = ws;
+async function handleDeleteMessage(messageId) {
+  if (!window.confirm("Delete this message?")) return;
+  await api(`/api/chats/${state.activeChatId}/messages/${messageId}`, { method: "DELETE" });
 }
 
-function buildMessageHTML(message, sender) {
-  const mine = message.sender_id === state.me.id;
-  const wrapper = document.createElement("div");
-  wrapper.className = "msg" + (mine ? " mine" : "");
-
-  const senderName = mine ? "You" : (sender?.name || `User #${message.sender_id}`);
-  let attachmentBlock = "";
-  if (message.attachment_url) {
-    const isImage = (message.attachment_mime || "").startsWith("image/");
-    attachmentBlock = `
-      <div><a href="${message.attachment_url}" target="_blank" rel="noopener">📎 ${message.attachment_name || "Attachment"}</a></div>
-      ${isImage ? `<img class="preview" src="${message.attachment_url}" alt="attachment"/>` : ""}
-    `;
+async function bootstrap() {
+  if (!state.token) {
+    showAuth();
+    return;
   }
-
-  wrapper.innerHTML = `
-    <div class="meta">${senderName} • ${formatTime(message.created_at)}</div>
-    ${message.text ? `<div class="text"></div>` : ""}
-    ${attachmentBlock}
-  `;
-  if (message.text) wrapper.querySelector(".text").textContent = message.text;
-  return wrapper;
-}
-
-function appendMessage(message, sender) {
-  ui.messages.appendChild(buildMessageHTML(message, sender));
-  ui.messages.scrollTop = ui.messages.scrollHeight;
-}
-
-async function selectChat(chatId) {
-  state.activeChatId = chatId;
-  state.activeChat = state.chats.find((c) => c.id === chatId) || null;
-  ui.chatTitle.textContent = state.activeChat ? chatDisplayName(state.activeChat) : "Chat";
-  renderChats();
-  openSocket(chatId);
-
-  const messages = await api(`/api/chats/${chatId}/messages?limit=100`);
-  const memberMap = Object.fromEntries((state.activeChat?.members || []).map((m) => [m.id, m]));
-  ui.messages.innerHTML = "";
-  for (const msg of messages) {
-    appendMessage(msg, memberMap[msg.sender_id]);
+  try {
+    state.me = await api("/api/users/me");
+    renderMe();
+    showChat();
+    await loadChats();
+  } catch {
+    clearToken();
+    showAuth();
   }
 }
 
@@ -321,20 +590,49 @@ ui.sendForm.addEventListener("submit", async (e) => {
   try {
     const fd = new FormData();
     const text = ui.messageText.value.trim();
+    const file = ui.messageFile.files[0];
     if (text) fd.append("text", text);
-    if (ui.messageFile.files[0]) fd.append("file", ui.messageFile.files[0]);
-    if (!text && !ui.messageFile.files[0]) return;
-
+    if (file) fd.append("file", file);
+    if (!text && !file) return;
     await api(`/api/chats/${state.activeChatId}/messages`, { method: "POST", body: fd });
     ui.messageText.value = "";
     ui.messageFile.value = "";
+    stopTyping();
   } catch (err) {
     alert(err.message);
   }
 });
 
+ui.messageText.addEventListener("input", () => {
+  if (!state.activeChatId) return;
+  const hasText = ui.messageText.value.trim().length > 0;
+  if (hasText && !state.typingActive) {
+    sendTyping(true);
+    state.typingActive = true;
+  }
+
+  if (!hasText) {
+    stopTyping();
+    return;
+  }
+
+  if (state.typingStopTimer) clearTimeout(state.typingStopTimer);
+  state.typingStopTimer = setTimeout(() => stopTyping(), TYPING_STOP_DELAY_MS);
+});
+
+ui.messages.addEventListener("scroll", async () => {
+  if (ui.messages.scrollTop < 80) {
+    await loadOlderMessagesIfNeeded();
+  }
+  if (isNearBottom()) {
+    await markReadUpToLatest().catch(() => {});
+  }
+});
+
 ui.logoutBtn.addEventListener("click", () => {
   closeSocket();
+  stopTyping();
+  clearTypingState();
   clearToken();
   state.me = null;
   state.chats = [];

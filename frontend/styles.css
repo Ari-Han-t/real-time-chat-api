@@ -190,7 +190,7 @@ hr {
 .main {
   height: 100vh;
   display: grid;
-  grid-template-rows: auto 1fr auto auto;
+  grid-template-rows: auto 1fr auto auto auto;
 }
 
 .chat-header {
@@ -208,6 +208,15 @@ hr {
   overflow-y: auto;
   display: grid;
   gap: 10px;
+}
+
+.typing-indicator {
+  min-height: 22px;
+  padding: 0 14px;
+  color: var(--muted);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
 }
 
 .msg {
@@ -234,6 +243,38 @@ hr {
 .msg .text {
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.msg .actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 6px;
+}
+
+.msg .actions button {
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 8px;
+}
+
+.msg .actions .edit {
+  background: #0d68dd;
+}
+
+.msg .actions .delete {
+  background: #b52e2e;
+}
+
+.msg .receipt {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.msg.deleted .text {
+  font-style: italic;
+  color: #7e889c;
 }
 
 .msg img.preview {
