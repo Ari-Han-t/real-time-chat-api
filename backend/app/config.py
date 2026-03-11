@@ -14,6 +14,14 @@ PROFILE_PIC_DIR.mkdir(parents=True, exist_ok=True)
 MESSAGE_FILE_DIR.mkdir(parents=True, exist_ok=True)
 
 MAX_UPLOAD_BYTES = 2 * 1024 * 1024
+MAX_MESSAGE_CHARS = int(os.getenv("MAX_MESSAGE_CHARS", "2000"))
+MAX_LINKS_PER_MESSAGE = int(os.getenv("MAX_LINKS_PER_MESSAGE", "4"))
+MAX_REPEAT_CHARS = int(os.getenv("MAX_REPEAT_CHARS", "14"))
+
+MESSAGE_RATE_LIMIT_COUNT = int(os.getenv("MESSAGE_RATE_LIMIT_COUNT", "40"))
+MESSAGE_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("MESSAGE_RATE_LIMIT_WINDOW_SECONDS", "60"))
+FILE_RATE_LIMIT_COUNT = int(os.getenv("FILE_RATE_LIMIT_COUNT", "15"))
+FILE_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("FILE_RATE_LIMIT_WINDOW_SECONDS", "60"))
 
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "change-this-in-production")
 JWT_ALGORITHM = "HS256"
@@ -44,3 +52,9 @@ ALLOWED_MESSAGE_EXTENSIONS = {
 }
 
 ALLOWED_PROFILE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+
+BANNED_TERMS = {
+    term.strip().lower()
+    for term in os.getenv("BANNED_TERMS", "").split(",")
+    if term.strip()
+}

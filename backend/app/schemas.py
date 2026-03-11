@@ -48,6 +48,10 @@ class MessagePublic(BaseModel):
     attachment_mime: Optional[str] = None
     attachment_size: Optional[int] = None
     created_at: datetime
+    updated_at: Optional[datetime] = None
+    is_edited: bool = False
+    is_deleted: bool = False
+    read_by_user_ids: list[int] = Field(default_factory=list)
 
 
 class ChatPublic(BaseModel):
@@ -63,3 +67,10 @@ class ChatPublic(BaseModel):
 class SendMessageResponse(BaseModel):
     message: MessagePublic
 
+
+class MessageUpdateRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)
+
+
+class MessageReadRequest(BaseModel):
+    last_message_id: int = Field(ge=1)

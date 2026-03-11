@@ -9,6 +9,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    false,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -86,7 +87,27 @@ class Message(Base):
     attachment_mime: Mapped[str | None] = mapped_column(String(120), nullable=True)
     attachment_size: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    is_edited: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=false())
+    is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=false())
 
     chat: Mapped[Chat] = relationship("Chat", back_populates="messages")
     sender: Mapped[User] = relationship("User", back_populates="sent_messages")
+    reads: Mapped[list["MessageRead"]] = relationship(
+        "MessageRead",
+        back_populates="message",
+        cascade="all, delete",
+    )
 
+
+class MessageRead(Base):
+    __tablename__ = "message_reads"
+    __table_args__ = (UniqueConstraint("message_id", "user_id", name="uq_message_read"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    message_id: Mapped[int] = mapped_column(ForeignKey("messages.id", ondelete="CASCADE"), index=True, nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    read_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    message: Mapped[Message] = relationship("Message", back_populates="reads")
+    user: Mapped[User] = relationship("User")

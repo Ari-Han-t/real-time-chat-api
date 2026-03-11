@@ -41,3 +41,16 @@ def save_profile_picture(file: UploadFile) -> tuple[str, int]:
 def save_message_attachment(file: UploadFile) -> tuple[str, int]:
     return _save_upload(file=file, destination_dir=MESSAGE_FILE_DIR, allowed_exts=ALLOWED_MESSAGE_EXTENSIONS)
 
+
+def delete_message_attachment(attachment_url: str | None) -> None:
+    if not attachment_url:
+        return
+    prefix = "/uploads/messages/"
+    if not attachment_url.startswith(prefix):
+        return
+    filename = attachment_url.removeprefix(prefix)
+    if "/" in filename or "\\" in filename:
+        return
+    path = MESSAGE_FILE_DIR / filename
+    if path.exists():
+        path.unlink(missing_ok=True)

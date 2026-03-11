@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, status
@@ -9,11 +10,13 @@ from .config import FRONTEND_DIR, MESSAGE_FILE_DIR, PROFILE_PIC_DIR
 from .database import Base, SessionLocal, engine
 from .models import ChatMember, User
 from .routers import auth, chats, users
+from .schema_upgrade import apply_schema_upgrades
 from .security import decode_access_token
 from .websocket_manager import manager
 
 
 Base.metadata.create_all(bind=engine)
+apply_schema_upgrades(engine)
 
 app = FastAPI(title="Real-Time Chat API", version="1.0.0")
 
@@ -66,12 +69,31 @@ async def chat_ws(websocket: WebSocket, chat_id: int):
     finally:
         db.close()
 
-    await manager.connect(chat_id, websocket)
+    await manager.connect(chat_id, websocket, user_id=user_id)
     try:
         while True:
-            message = await websocket.receive_text()
-            if message.strip().lower() == "ping":
+            raw = await websocket.receive_text()
+            if raw.strip().lower() == "ping":
                 await websocket.send_json({"type": "pong"})
+                continue
+
+            try:
+                payload = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+
+            event_type = payload.get("type")
+            if event_type == "typing":
+                await manager.broadcast(
+                    chat_id,
+                    {
+                        "type": "typing",
+                        "chat_id": chat_id,
+                        "user_id": user_id,
+                        "is_typing": bool(payload.get("is_typing", False)),
+                    },
+                    exclude_user_id=user_id,
+                )
     except WebSocketDisconnect:
         manager.disconnect(chat_id, websocket)
     except Exception:
@@ -99,4 +121,3 @@ def app_js():
 @app.get("/styles.css")
 def styles_css():
     return _frontend_file("styles.css")
-
